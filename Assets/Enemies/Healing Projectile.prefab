@@ -25,7 +25,7 @@ GameObject:
   - component: {fileID: 54878299533003528}
   - component: {fileID: 114642376457601840}
   m_Layer: 0
-  m_Name: Fast Projectile
+  m_Name: Healing Projectile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -58,7 +58,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_Materials:
-  - {fileID: 2100000, guid: 4b5dce0492bdfb648a389fe390071625, type: 2}
+  - {fileID: 2100000, guid: da00283997404ab4daeb68c814b13fe8, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
