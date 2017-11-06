@@ -13,6 +13,7 @@ public class EnemyHealthBar : MonoBehaviour
     {
         enemy = GetComponentInParent<Enemy>(); // Different to way player's health bar finds player
         healthBarRawImage = GetComponent<RawImage>();
+        print(healthBarRawImage);
     }
 
     // Update is called once per frame
