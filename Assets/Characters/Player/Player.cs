@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 
 public class Player : MonoBehaviour, IDamageable {
 
@@ -9,6 +11,7 @@ public class Player : MonoBehaviour, IDamageable {
     [SerializeField] float damagePerHit = 10f;
     [SerializeField] float minTimeBetweenHits = 0.5f;
     [SerializeField] float maxAttackRange = 2f;
+    [SerializeField] Weapon weaponInUse;
 
     GameObject currentTarget;
     float currentHealthPoints;
@@ -25,11 +28,36 @@ public class Player : MonoBehaviour, IDamageable {
 
     void Start()
     {
-        cameraRaycaster = FindObjectOfType<CameraRaycaster>();
-        cameraRaycaster.notifyMouseClickObservers += OnMouseClick;
+        RegisterForMouseClick();
         currentHealthPoints = maxHealthPoints;
+        PutWeaponInHand();
     }
 
+    private void PutWeaponInHand()
+    {
+        var weaponPrefab = weaponInUse.GetWeaponPrefab();
+        GameObject dominantHand = RequestDominantHand();
+        var weapon = Instantiate(weaponPrefab, dominantHand.transform);
+        weapon.transform.localPosition = weaponInUse.gripTransform.localPosition;
+        weapon.transform.localRotation = weaponInUse.gripTransform.localRotation;
+    }
+
+    private GameObject RequestDominantHand()
+    {
+        var dominantHands = GetComponentsInChildren<DominantHand>();
+        int numberOfDominantHands = dominantHands.Length;
+        Assert.IsFalse(numberOfDominantHands <= 0, "No dominantHand found on player. Please add one");
+        Assert.IsFalse(numberOfDominantHands > 1, "Multiple dominant hand scripts on player. Please remove one");
+        return dominantHands[0].gameObject;
+    }
+
+    private void RegisterForMouseClick()
+    {
+        cameraRaycaster = FindObjectOfType<CameraRaycaster>();
+        cameraRaycaster.notifyMouseClickObservers += OnMouseClick;
+    }
+
+    // TODO refactor to reduce number of lines
     void OnMouseClick(RaycastHit raycastHit, int layerHit)
     {
         if (layerHit == enemyLayer)
@@ -43,6 +71,7 @@ public class Player : MonoBehaviour, IDamageable {
             }
 
             currentTarget = enemy;
+
             var enemyComponent = enemy.GetComponent<Enemy>();
             if (Time.time - lastHitTime > minTimeBetweenHits)
             {
