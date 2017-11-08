@@ -806,6 +806,8 @@ MonoBehaviour:
   minTimeBetweenHits: 1
   maxAttackRange: 2
   weaponInUse: {fileID: 11400000, guid: 11c596b419978b842b670b4368d95488, type: 2}
+  animatorOverrideController: {fileID: 22100000, guid: 429c39990d885ca45ad9e7a9a6354128,
+    type: 2}
 --- !u!114 &114479109939894042
 MonoBehaviour:
   m_ObjectHideFlags: 1
