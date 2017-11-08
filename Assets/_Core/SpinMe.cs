@@ -2,21 +2,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SpinMe : MonoBehaviour {
+namespace RPG.Core
+{
+    public class SpinMe : MonoBehaviour
+    {
 
-	[SerializeField] float xRotationsPerMinute = 1f;
-	[SerializeField] float yRotationsPerMinute = 1f;
-	[SerializeField] float zRotationsPerMinute = 1f;
-	
-	void Update () {
+        [SerializeField] float xRotationsPerMinute = 1f;
+        [SerializeField] float yRotationsPerMinute = 1f;
+        [SerializeField] float zRotationsPerMinute = 1f;
 
-        float xDegreesPerFrame = xRotationsPerMinute * Time.deltaTime * 360 / 60;
-        transform.RotateAround (transform.position, transform.right, xDegreesPerFrame);
+        void Update()
+        {
 
-		float yDegreesPerFrame = yRotationsPerMinute * Time.deltaTime * 360 / 60;
-        transform.RotateAround (transform.position, transform.up, yDegreesPerFrame);
+            float xDegreesPerFrame = xRotationsPerMinute * Time.deltaTime * 360 / 60;
+            transform.RotateAround(transform.position, transform.right, xDegreesPerFrame);
 
-        float zDegreesPerFrame = zRotationsPerMinute * Time.deltaTime * 360 / 60; 
-        transform.RotateAround (transform.position, transform.forward, zDegreesPerFrame);
-	}
+            float yDegreesPerFrame = yRotationsPerMinute * Time.deltaTime * 360 / 60;
+            transform.RotateAround(transform.position, transform.up, yDegreesPerFrame);
+
+            float zDegreesPerFrame = zRotationsPerMinute * Time.deltaTime * 360 / 60;
+            transform.RotateAround(transform.position, transform.forward, zDegreesPerFrame);
+        }
+    }
+
 }
