@@ -1373,8 +1373,8 @@ Transform:
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 149790}
-  m_LocalRotation: {x: -0, y: 0.5943194, z: -0, w: -0.8042291}
-  m_LocalPosition: {x: -147.58, y: 0, z: -154.98}
+  m_LocalRotation: {x: -0, y: 0.74865705, z: -0, w: -0.6629575}
+  m_LocalPosition: {x: -140.57, y: 0, z: -144.96}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 469942}
@@ -1384,7 +1384,7 @@ Transform:
   - {fileID: 4277129770102078}
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 287.072, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 263.052, z: 0}
 --- !u!4 &409212
 Transform:
   m_ObjectHideFlags: 1
@@ -2410,7 +2410,7 @@ Transform:
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 100098}
-  m_LocalRotation: {x: 0.5326752, y: 0.070340455, z: 0.83613276, w: -0.110415146}
+  m_LocalRotation: {x: 0.53267515, y: 0.07034045, z: 0.83613265, w: -0.11041513}
   m_LocalPosition: {x: 0.000022271464, y: -0.00006150465, z: 0.026027026}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
@@ -2799,9 +2799,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealthPoints: 100
-  chaseRadius: 15
-  attackRadius: 5
-  damagePerShot: -5
+  chaseRadius: 0
+  attackRadius: 10
+  damagePerShot: -10
   secondsBetweenShots: 0.5
   projectileToUse: {fileID: 1751730630509442, guid: eebb92a749b86134bad01c412560d926,
     type: 2}
