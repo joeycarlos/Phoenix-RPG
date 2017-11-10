@@ -19,38 +19,61 @@ public class Player : MonoBehaviour {
     [SerializeField] float frontGlideDrag = 5f;
     [SerializeField] float sideGlideDrag = 5f;
     [SerializeField] float dodgeStateTime = 1f;
+    [SerializeField] float projectileVerticalOffset = 1.7f;
+    [SerializeField] float projectileHorizontalOffset = 1.5f;
+    [SerializeField] float initialProjectileForce = 30f;
+    [SerializeField] float timeBetweenShots = 0.5f;
+
+    [SerializeField] GameObject projectile;
 
     private Transform cameraTransform;                  // A reference to the main camera in the scenes transform
-    private Vector3 cameraDirection;             // The current forward direction of the camera
     private Vector3 moveVector;
     private Rigidbody rb;
 
     private float currentJumpForce;
     private Vector3 dodgeForceVector;
 
+    private float timeUntilNextShot;
+
     private bool inAerialDodgeState;
 
     void Start () {
         cameraTransform = Camera.main.transform;
-        print(cameraTransform);
         rb = GetComponent<Rigidbody>();
         currentJumpForce = minJumpForce;
         inAerialDodgeState = false;
+        timeUntilNextShot = 0;
     }
 
     private void Update()
     {
+        timeUntilNextShot -= Time.deltaTime;
+
         if (Input.GetKey(KeyCode.Space) && isGrounded() && currentJumpForce < maxJumpForce) { ChargeJump(); }
 
         if (Input.GetKeyUp(KeyCode.Space) && isGrounded()) { ExecuteJump(); }
 
         if (Input.GetKeyDown(KeyCode.LeftShift)) { ExecuteDodge(); }
+
+        if (Input.GetKey(KeyCode.Mouse0) && timeUntilNextShot <= 0)
+        {
+            ShootProjectile();
+            timeUntilNextShot = timeBetweenShots;
+        }
     }
 
     private void FixedUpdate()
     {
         MovePlayer();
         RotatePlayer();
+    }
+
+    private void ShootProjectile()
+    {
+        Vector3 projectileSpawnPoint = transform.position + (transform.forward.normalized * projectileHorizontalOffset) + transform.up * projectileVerticalOffset;
+        GameObject clone = Instantiate(projectile, projectileSpawnPoint, Quaternion.FromToRotation(Vector3.up, transform.forward)) as GameObject;
+        Rigidbody rb = clone.GetComponent<Rigidbody>();
+        rb.AddForce(transform.forward * initialProjectileForce, ForceMode.Impulse);
     }
 
     private void ExecuteDodge()
@@ -145,7 +168,6 @@ public class Player : MonoBehaviour {
     // rotate player to match camera free look rotation
     private void RotatePlayer()
     {
-        cameraDirection = Vector3.Scale(cameraTransform.forward, new Vector3(1, 0, 1)).normalized;
         Quaternion rotation = Quaternion.LookRotation(cameraTransform.forward, cameraTransform.up);
         transform.rotation = rotation;
     }
