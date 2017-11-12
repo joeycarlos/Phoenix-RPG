@@ -23,8 +23,20 @@ public class Player : MonoBehaviour {
     [SerializeField] float projectileHorizontalOffset = 1.5f;
     [SerializeField] float initialProjectileForce = 30f;
     [SerializeField] float timeBetweenShots = 0.5f;
+    [SerializeField] float backwardsMovementDivisor = 2f;
+    [SerializeField] private float dodgeSpeedMultiplier = 4f;
+    [SerializeField] private float chargeJumpSpeedDivisor = 3f;
 
     [SerializeField] GameObject projectile;
+
+    public Animator animator;
+    private float horizontalInput;
+    private float verticalInput;
+    private bool inAir;
+    private bool inDodgeState;
+    private bool inChargeJumpState;
+
+
 
     private Transform cameraTransform;                  // A reference to the main camera in the scenes transform
     private Vector3 moveVector;
@@ -33,16 +45,18 @@ public class Player : MonoBehaviour {
     private float currentJumpForce;
     private Vector3 dodgeForceVector;
 
-    private float timeUntilNextShot;
-
     private bool inAerialDodgeState;
+
+    private float timeUntilNextShot;
 
     void Start () {
         cameraTransform = Camera.main.transform;
         rb = GetComponent<Rigidbody>();
         currentJumpForce = minJumpForce;
         inAerialDodgeState = false;
+        inChargeJumpState = false;
         timeUntilNextShot = 0;
+        animator = GetComponentInChildren<Animator>();
     }
 
     private void Update()
@@ -53,17 +67,14 @@ public class Player : MonoBehaviour {
 
         if (Input.GetKeyUp(KeyCode.Space) && isGrounded()) { ExecuteJump(); }
 
-        if (Input.GetKeyDown(KeyCode.LeftShift)) { ExecuteDodge(); }
-
         if (Input.GetKey(KeyCode.Mouse0) && timeUntilNextShot <= 0)
         {
             ShootProjectile();
             timeUntilNextShot = timeBetweenShots;
         }
-    }
 
-    private void FixedUpdate()
-    {
+        if (Input.GetKeyDown(KeyCode.LeftShift)) { ExecuteDodge(); }
+
         MovePlayer();
         RotatePlayer();
     }
@@ -78,25 +89,15 @@ public class Player : MonoBehaviour {
 
     private void ExecuteDodge()
     {
-        // if not moving, default to backwards dodge
-        if (moveVector.magnitude == 0)
-            dodgeForceVector = -transform.forward;
-        else
-            dodgeForceVector = Vector3.Scale(Vector3.Normalize(moveVector), (new Vector3(1, 0, 1)).normalized);
+        inDodgeState = true;
+        Invoke("SetAnimDodgeStateFalse", dodgeStateTime);
+        animator.SetBool("inDodgeState", inDodgeState);
+    }
 
-        dodgeForceVector = Vector3.Scale(dodgeForceVector, new Vector3(dodgeHorizontalMultiplier, 0, dodgeHorizontalMultiplier));
-
-        if (isGrounded())
-        {
-            dodgeForceVector += new Vector3(0, groundedDodgeLift, 0);
-        } else
-        {
-            dodgeForceVector += new Vector3(0, aerialDodgeLift, 0);
-            inAerialDodgeState = true;
-            Invoke("SetDodgeStateFalse", dodgeStateTime);
-        }
-
-        rb.AddForce(dodgeForceVector, ForceMode.Impulse);
+    private void SetAnimDodgeStateFalse()
+    {
+        inDodgeState = false;
+        animator.SetBool("inDodgeState", inDodgeState);
     }
 
     private void SetDodgeStateFalse()
@@ -107,6 +108,8 @@ public class Player : MonoBehaviour {
     private void ChargeJump()
     {
         currentJumpForce += Time.deltaTime * jumpChargeRate;
+        inChargeJumpState = true;
+        animator.SetBool("inChargeJumpState", inChargeJumpState);
     }
 
     private void ExecuteJump()
@@ -114,46 +117,42 @@ public class Player : MonoBehaviour {
         currentJumpForce = Mathf.Clamp(currentJumpForce, minJumpForce, maxJumpForce);
         rb.AddForce(0, currentJumpForce, 0, ForceMode.Impulse);
         currentJumpForce = minJumpForce;
+        inChargeJumpState = false;
+        animator.SetBool("inChargeJumpState", inChargeJumpState);
     }
 
     // move player according to worldspace
     private void MovePlayer()
     {
-        float horizontalInput = 0;
-        float verticalInput = 0;
+        horizontalInput = Input.GetAxis("Horizontal");
+        verticalInput = Input.GetAxis("Vertical");
+
+        animator.SetFloat("horizontalInput", horizontalInput);
+        animator.SetFloat("verticalInput", verticalInput);
+
         rb.drag = 0;
 
-        if (isGrounded())
+        if (!isGrounded())
         {
-            if (Input.GetKey(KeyCode.W)) verticalInput = 1;
-            if (Input.GetKey(KeyCode.S)) verticalInput = -1;
-            if (Input.GetKey(KeyCode.A)) horizontalInput = -1;
-            if (Input.GetKey(KeyCode.D)) horizontalInput = 1;
 
-        }
-        else
-        {
-            if (Input.GetKey(KeyCode.W) )
+            if (verticalInput == 1 && rb.velocity.y < 0 && !inAerialDodgeState)
             {
-                verticalInput = forwardGlideMultiplier;
-                if (rb.velocity.y < 0 && !inAerialDodgeState) rb.drag = frontGlideDrag;
-
+                rb.drag = frontGlideDrag;
             }
-            if (Input.GetKey(KeyCode.S) && rb.velocity.y < 0 && !inAerialDodgeState)
+                
+            else if (Input.GetKey(KeyCode.S) && rb.velocity.y < 0 && !inAerialDodgeState)
             {
                 rb.drag = backGlideDrag;
             }
-            if (Input.GetKey(KeyCode.A))
+
+            if ( (horizontalInput == -1 || horizontalInput == 1) && rb.velocity.y < 0 && !inAerialDodgeState)
             {
-                horizontalInput = -1;
-                if (rb.velocity.y < 0 && !inAerialDodgeState) rb.drag = sideGlideDrag;
-            }
-            if (Input.GetKey(KeyCode.D))
-            {
-                horizontalInput = 1;
-                if (rb.velocity.y < 0 && !inAerialDodgeState) rb.drag = sideGlideDrag;
+                rb.drag = sideGlideDrag;
             }
         }
+
+        // slow backwards movement
+        if (verticalInput < 0 && !inDodgeState) verticalInput = verticalInput / backwardsMovementDivisor;
 
         horizontalInput = horizontalInput * Time.deltaTime * horizontalMoveSpeed;
         Vector3 playerRight = Vector3.Scale(transform.right, new Vector3(1, 0, 1)).normalized;
@@ -162,6 +161,24 @@ public class Player : MonoBehaviour {
         Vector3 playerForward = Vector3.Scale(transform.forward, new Vector3(1, 0, 1)).normalized;
 
         moveVector = verticalInput * playerForward + horizontalInput * playerRight;
+
+        moveVector = Vector3.ClampMagnitude(moveVector, verticalMoveSpeed);
+
+        if (inDodgeState)
+        {
+            moveVector = moveVector * dodgeSpeedMultiplier;
+        }
+
+        if (verticalInput >= 0 && !isGrounded() && !inDodgeState)
+        {
+            verticalInput = verticalInput * Time.deltaTime * verticalMoveSpeed * forwardGlideMultiplier;
+        }
+
+        if (inChargeJumpState)
+        {
+            moveVector = moveVector / chargeJumpSpeedDivisor;
+        }
+
         transform.Translate(moveVector, Space.World);
     }
 
@@ -176,9 +193,16 @@ public class Player : MonoBehaviour {
     private bool isGrounded()
     {
         if (Physics.Raycast(transform.position, Vector3.down, 0.5f))
+        {
+            inAir = false;
+            animator.SetBool("inAir", inAir);
             return true;
+        }
+
         else
-            return false;
+            inAir = true;
+        animator.SetBool("inAir", inAir);
+        return false;
     }
 
 }
