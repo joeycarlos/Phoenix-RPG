@@ -43,6 +43,7 @@ public class Player : MonoBehaviour {
     public Animator animator;
     private Rigidbody rb;
     private Transform cameraTransform;
+    private CapsuleCollider capsuleCollider;
 
     // INPUT AXIS
     private float horizontalInput;
@@ -51,8 +52,7 @@ public class Player : MonoBehaviour {
     // STATE BOOL
     private bool inChargeJumpState;
     private bool inDodgeState;
-    private bool inAerialDodgeState;
-    private bool isGrounded;
+    [SerializeField] private bool isGrounded;
 
     // STATE FLOAT
     private float timeUntilNextShot;
@@ -70,11 +70,11 @@ public class Player : MonoBehaviour {
         animator = GetComponentInChildren<Animator>();
         rb = GetComponent<Rigidbody>();
         cameraTransform = Camera.main.transform;
+        capsuleCollider = GetComponent<CapsuleCollider>();
 
         // Initialize state variables
         inDodgeState = false;
         inChargeJumpState = false;
-        inAerialDodgeState = false;
         isGrounded = false;
 
         currentJumpForce = minJumpForce;
@@ -84,7 +84,7 @@ public class Player : MonoBehaviour {
 
     private void Update()
     {
-        CheckIfGrounded();
+        UpdateGrounded();
         DecrementShootingCooldown();
 
         // Read input
@@ -238,22 +238,28 @@ public class Player : MonoBehaviour {
     }
 
 
+
+
     // ----- GENERAL HELPER FUNCTIONS -----
-    private bool CheckIfGrounded()
+
+    private void UpdateGrounded()
     {
-        // if raycast detects something very close below, return true and change state
-        if (Physics.Raycast(transform.position, Vector3.down, 0.5f))
-        {
-            isGrounded = true;
-            return true;
-        }
-        else
-        {
-            isGrounded = false;
-            return false;
-        }
+        float radius = capsuleCollider.radius * 0.9f;
+        // Check against default layer
+        int layerMask = 1 << 0;
+
+        if (Physics.CheckSphere(transform.position + Vector3.up*(radius - 0.2f), radius, layerMask)) { isGrounded = true; }
+        else { isGrounded = false; }
+
+        return;
     }
 
+    private void OnDrawGizmosSelected()
+    {
+        float radius = capsuleCollider.radius * 0.9f;
 
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position + Vector3.up*(radius - 0.2f), radius);
+    }
 
 }
