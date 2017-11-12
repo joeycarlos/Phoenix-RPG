@@ -6,203 +6,254 @@ using UnityStandardAssets.CrossPlatformInput;
 
 public class Player : MonoBehaviour {
 
+
+    // ----- EDITABLE VARIABLES -----
+
+    // GENERAL MOVEMENT VARIABLES
     [SerializeField] float horizontalMoveSpeed = 10f;
     [SerializeField] float verticalMoveSpeed = 10f;
+    [SerializeField] float backwardsMovementDivisor = 2f;
+
+    // JUMP VARIABLES
     [SerializeField] float minJumpForce = 4f;
     [SerializeField] float maxJumpForce = 8f;
     [SerializeField] float jumpChargeRate = 6f;
-    [SerializeField] float groundedDodgeLift = 3f;
-    [SerializeField] float aerialDodgeLift = 10f;
-    [SerializeField] float dodgeHorizontalMultiplier = 30f;
-    [SerializeField] float forwardGlideMultiplier = 3f;
+    [SerializeField] float chargeJumpSpeedDivisor = 3f;
+
+    // GLIDING VARIABLES
     [SerializeField] float backGlideDrag = 10f;
     [SerializeField] float frontGlideDrag = 5f;
     [SerializeField] float sideGlideDrag = 5f;
+
+    // DODGE VARIABLES
     [SerializeField] float dodgeStateTime = 1f;
+    [SerializeField] float dodgeSpeedMultiplier = 4f;
+
+    // PROJECTILE ATTACK VARIABLES
     [SerializeField] float projectileVerticalOffset = 1.7f;
     [SerializeField] float projectileHorizontalOffset = 1.5f;
     [SerializeField] float initialProjectileForce = 30f;
     [SerializeField] float timeBetweenShots = 0.5f;
-    [SerializeField] float backwardsMovementDivisor = 2f;
-    [SerializeField] private float dodgeSpeedMultiplier = 4f;
-    [SerializeField] private float chargeJumpSpeedDivisor = 3f;
-
     [SerializeField] GameObject projectile;
 
+
+    // ----- PRIVATE VARIABLES -----
+
+    // EXTERNAL REFERENCES
     public Animator animator;
+    private Rigidbody rb;
+    private Transform cameraTransform;
+
+    // INPUT AXIS
     private float horizontalInput;
     private float verticalInput;
-    private bool inAir;
-    private bool inDodgeState;
+
+    // STATE BOOL
     private bool inChargeJumpState;
-
-
-
-    private Transform cameraTransform;                  // A reference to the main camera in the scenes transform
-    private Vector3 moveVector;
-    private Rigidbody rb;
-
-    private float currentJumpForce;
-    private Vector3 dodgeForceVector;
-
+    private bool inDodgeState;
     private bool inAerialDodgeState;
+    private bool isGrounded;
 
+    // STATE FLOAT
     private float timeUntilNextShot;
+    private float currentJumpForce;
+
+    // STATE VECTOR
+    private Vector3 moveVector;
+
+
+    // ----- MAIN FLOW ----- 
 
     void Start () {
-        cameraTransform = Camera.main.transform;
-        rb = GetComponent<Rigidbody>();
-        currentJumpForce = minJumpForce;
-        inAerialDodgeState = false;
-        inChargeJumpState = false;
-        timeUntilNextShot = 0;
+
+        // Link external components
         animator = GetComponentInChildren<Animator>();
+        rb = GetComponent<Rigidbody>();
+        cameraTransform = Camera.main.transform;
+
+        // Initialize state variables
+        inDodgeState = false;
+        inChargeJumpState = false;
+        inAerialDodgeState = false;
+        isGrounded = false;
+
+        currentJumpForce = minJumpForce;
+        timeUntilNextShot = 0;
+        
     }
 
     private void Update()
     {
-        timeUntilNextShot -= Time.deltaTime;
+        CheckIfGrounded();
+        DecrementShootingCooldown();
 
-        if (Input.GetKey(KeyCode.Space) && isGrounded() && currentJumpForce < maxJumpForce) { ChargeJump(); }
+        // Read input
+        if (Input.GetKey(KeyCode.Space) && isGrounded && !inDodgeState)                                         { ChargeJump(); }
+        if (Input.GetKeyUp(KeyCode.Space) && isGrounded)                                                        { ExecuteJump(); }
+        if (Input.GetKey(KeyCode.Mouse0) && timeUntilNextShot <= 0 && !inChargeJumpState && !inDodgeState)      { ShootProjectile(); }
+        if (Input.GetKeyDown(KeyCode.LeftShift) && !inChargeJumpState)                                          { EnterDodgeState(); }
+        ReadMovementInput();
 
-        if (Input.GetKeyUp(KeyCode.Space) && isGrounded()) { ExecuteJump(); }
+        // Adjust movement
+        UpdateAerialDrag();
+        CalculateMoveVector();
 
-        if (Input.GetKey(KeyCode.Mouse0) && timeUntilNextShot <= 0)
-        {
-            ShootProjectile();
-            timeUntilNextShot = timeBetweenShots;
-        }
-
-        if (Input.GetKeyDown(KeyCode.LeftShift)) { ExecuteDodge(); }
-
+        // Move and rotate the player
         MovePlayer();
         RotatePlayer();
+
+        // Update animator
+        UpdateAnimator();
     }
 
-    private void ShootProjectile()
+
+    // ----- MOVE HELPER FUNCTIONS -----
+
+    private void ReadMovementInput()
     {
-        Vector3 projectileSpawnPoint = transform.position + (transform.forward.normalized * projectileHorizontalOffset) + transform.up * projectileVerticalOffset;
-        GameObject clone = Instantiate(projectile, projectileSpawnPoint, Quaternion.FromToRotation(Vector3.up, transform.forward)) as GameObject;
-        Rigidbody rb = clone.GetComponent<Rigidbody>();
-        rb.AddForce(transform.forward * initialProjectileForce, ForceMode.Impulse);
+        horizontalInput = Input.GetAxis("Horizontal");
+        verticalInput = Input.GetAxis("Vertical");
     }
 
-    private void ExecuteDodge()
+    private void CalculateMoveVector()
+    {
+        // Calculate horizontal move vector component
+        float horizontalMagnitude = horizontalInput * Time.deltaTime * horizontalMoveSpeed;
+        Vector3 playerRightDirection = Vector3.Scale(transform.right, new Vector3(1, 0, 1)).normalized;
+
+        // Calculate vertical move vector component
+        float verticalMagnitude = verticalInput * Time.deltaTime * verticalMoveSpeed;
+        Vector3 playerForwardDirection = Vector3.Scale(transform.forward, new Vector3(1, 0, 1)).normalized;
+
+        // Calculate resultant vector
+        moveVector = verticalMagnitude * playerForwardDirection + horizontalMagnitude * playerRightDirection;
+        moveVector = Vector3.ClampMagnitude(moveVector, verticalMoveSpeed);                                     // Ensure diagonal speed is capped at forward speed
+
+        // Adjust move vector for special cases
+        if (verticalInput < 0 && !inDodgeState) moveVector = moveVector / backwardsMovementDivisor;             // Reduce backwards movement
+        if (inDodgeState) { moveVector = moveVector * dodgeSpeedMultiplier; }                                   // Increase movement speed if dodging
+        if (inChargeJumpState) { moveVector = moveVector / chargeJumpSpeedDivisor; }                            // Reduce movement speed if charging a jump
+    }
+
+    // Increase drag if descending and not dodging -- to emulate gliding
+    private void UpdateAerialDrag()
+    {
+        rb.drag = 0;
+
+        if (!isGrounded && rb.velocity.y < 0 && !inDodgeState)
+        {
+            if (verticalInput == 1) { rb.drag = frontGlideDrag; }                                       // forward glide
+            else if (verticalInput == -1) { rb.drag = backGlideDrag; }                                  // backward glide
+            else if ((horizontalInput == -1 || horizontalInput == 1)) { rb.drag = sideGlideDrag; }      // side glide
+        }
+    }
+
+    private void MovePlayer()
+    {
+        transform.Translate(moveVector, Space.World);   // Move the transform relative to worldspace
+    }
+
+    private void RotatePlayer()
+    {
+        // rotate player to match camera free look rotation
+        Quaternion cameraRotation = Quaternion.LookRotation(cameraTransform.forward, cameraTransform.up);
+        transform.rotation = cameraRotation;
+    }
+
+
+    // ----- DODGE HELPER FUNCTIONS -----
+
+    private void EnterDodgeState()
     {
         inDodgeState = true;
-        Invoke("SetAnimDodgeStateFalse", dodgeStateTime);
-        animator.SetBool("inDodgeState", inDodgeState);
+        Invoke("ExitDodgeState", dodgeStateTime);
     }
 
-    private void SetAnimDodgeStateFalse()
+    private void ExitDodgeState()
     {
         inDodgeState = false;
-        animator.SetBool("inDodgeState", inDodgeState);
     }
 
-    private void SetDodgeStateFalse()
+
+    // ----- JUMP HELPER FUNCTIONS -----
+
+    private void EnterChargeJumpState()
     {
-        inAerialDodgeState = false;
+        inChargeJumpState = true;
+    }
+
+    private void ExitChargeJumpState()
+    {
+        inChargeJumpState = false;
     }
 
     private void ChargeJump()
     {
+        if (inChargeJumpState == false) EnterChargeJumpState();
         currentJumpForce += Time.deltaTime * jumpChargeRate;
-        inChargeJumpState = true;
-        animator.SetBool("inChargeJumpState", inChargeJumpState);
+
     }
 
     private void ExecuteJump()
     {
-        currentJumpForce = Mathf.Clamp(currentJumpForce, minJumpForce, maxJumpForce);
-        rb.AddForce(0, currentJumpForce, 0, ForceMode.Impulse);
-        currentJumpForce = minJumpForce;
-        inChargeJumpState = false;
-        animator.SetBool("inChargeJumpState", inChargeJumpState);
+        currentJumpForce = Mathf.Clamp(currentJumpForce, minJumpForce, maxJumpForce);   // ensure jump force is within bounds
+        rb.AddForce(0, currentJumpForce, 0, ForceMode.Impulse);                         // execute jump
+        currentJumpForce = minJumpForce;                                                // reset stored jump force
+        ExitChargeJumpState();
     }
 
-    // move player according to worldspace
-    private void MovePlayer()
-    {
-        horizontalInput = Input.GetAxis("Horizontal");
-        verticalInput = Input.GetAxis("Vertical");
 
+    // ----- PROJECTILE ATTACK HELPER FUNCTIONS -----
+
+    private void ShootProjectile()
+    {
+        // Define projectile spawn point relative to character
+        Vector3 projectileSpawnPoint = transform.position + (transform.forward.normalized * projectileHorizontalOffset) + transform.up * projectileVerticalOffset;
+
+        // Create projectile
+        GameObject clone = Instantiate(projectile, projectileSpawnPoint, Quaternion.FromToRotation(Vector3.up, transform.forward)) as GameObject;
+
+        // Shoot projectile
+        Rigidbody rb = clone.GetComponent<Rigidbody>();
+        rb.AddForce(transform.forward * initialProjectileForce, ForceMode.Impulse);
+
+        // Reset shot recharge countdown
+        timeUntilNextShot = timeBetweenShots;
+    }
+
+    private void DecrementShootingCooldown()
+    {
+        timeUntilNextShot -= Time.deltaTime;
+    }
+    
+
+    // ----- ANIMATOR HELPER FUNCTIONS -----
+    private void UpdateAnimator()
+    {
+        animator.SetBool("inDodgeState", inDodgeState);
+        animator.SetBool("inChargeJumpState", inChargeJumpState);
+        animator.SetBool("isGrounded", isGrounded);
         animator.SetFloat("horizontalInput", horizontalInput);
         animator.SetFloat("verticalInput", verticalInput);
-
-        rb.drag = 0;
-
-        if (!isGrounded())
-        {
-
-            if (verticalInput == 1 && rb.velocity.y < 0 && !inAerialDodgeState)
-            {
-                rb.drag = frontGlideDrag;
-            }
-                
-            else if (Input.GetKey(KeyCode.S) && rb.velocity.y < 0 && !inAerialDodgeState)
-            {
-                rb.drag = backGlideDrag;
-            }
-
-            if ( (horizontalInput == -1 || horizontalInput == 1) && rb.velocity.y < 0 && !inAerialDodgeState)
-            {
-                rb.drag = sideGlideDrag;
-            }
-        }
-
-        // slow backwards movement
-        if (verticalInput < 0 && !inDodgeState) verticalInput = verticalInput / backwardsMovementDivisor;
-
-        horizontalInput = horizontalInput * Time.deltaTime * horizontalMoveSpeed;
-        Vector3 playerRight = Vector3.Scale(transform.right, new Vector3(1, 0, 1)).normalized;
-
-        verticalInput = verticalInput * Time.deltaTime * verticalMoveSpeed;
-        Vector3 playerForward = Vector3.Scale(transform.forward, new Vector3(1, 0, 1)).normalized;
-
-        moveVector = verticalInput * playerForward + horizontalInput * playerRight;
-
-        moveVector = Vector3.ClampMagnitude(moveVector, verticalMoveSpeed);
-
-        if (inDodgeState)
-        {
-            moveVector = moveVector * dodgeSpeedMultiplier;
-        }
-
-        if (verticalInput >= 0 && !isGrounded() && !inDodgeState)
-        {
-            verticalInput = verticalInput * Time.deltaTime * verticalMoveSpeed * forwardGlideMultiplier;
-        }
-
-        if (inChargeJumpState)
-        {
-            moveVector = moveVector / chargeJumpSpeedDivisor;
-        }
-
-        transform.Translate(moveVector, Space.World);
     }
 
-    // rotate player to match camera free look rotation
-    private void RotatePlayer()
-    {
-        Quaternion rotation = Quaternion.LookRotation(cameraTransform.forward, cameraTransform.up);
-        transform.rotation = rotation;
-    }
 
-    // if raycast detects something very close below, return true
-    private bool isGrounded()
+    // ----- GENERAL HELPER FUNCTIONS -----
+    private bool CheckIfGrounded()
     {
+        // if raycast detects something very close below, return true and change state
         if (Physics.Raycast(transform.position, Vector3.down, 0.5f))
         {
-            inAir = false;
-            animator.SetBool("inAir", inAir);
+            isGrounded = true;
             return true;
         }
-
         else
-            inAir = true;
-        animator.SetBool("inAir", inAir);
-        return false;
+        {
+            isGrounded = false;
+            return false;
+        }
     }
+
+
 
 }
